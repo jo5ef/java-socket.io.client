@@ -2,6 +2,8 @@ package com.clwillingham.socket.io;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -9,8 +11,9 @@ import org.json.JSONObject;
 
 import net.tootallnate.websocket.WebSocketClient;
 
-public class IOWebSocket extends WebSocketClient{
+public class IOWebSocket extends WebSocketClient {
 	
+	private Timer closeTimeout;
 	private MessageCallback callback;
 	private IOSocket ioSocket;
 	private static int currentID = 0;
@@ -31,8 +34,12 @@ public class IOWebSocket extends WebSocketClient{
 
 	@Override
 	public void onMessage(String arg0) {
-		// TODO Auto-generated method stub
-		System.out.println(arg0);
+		// The javascript socket.io client doesn't seem
+		// to use the hearbeat timeout at all, just the close
+		// timeout.
+		clearCloseTimeout();
+		setCloseTimeout();
+		
 		IOMessage message = IOMessage.parseMsg(arg0);
 		
 		switch (message.getType()) {			
@@ -98,6 +105,8 @@ public class IOWebSocket extends WebSocketClient{
 		}
 
 		ioSocket.onOpen();
+		
+		setCloseTimeout();
 	}
 	
 	@Override
@@ -105,7 +114,6 @@ public class IOWebSocket extends WebSocketClient{
 		ioSocket.onClose();
 		ioSocket.onDisconnect();
 	}
-
 
 	public void init(String path) throws IOException{
 		send("1::"+path);
@@ -115,6 +123,7 @@ public class IOWebSocket extends WebSocketClient{
 		this.send("1::"+path+"?"+query);
 		
 	}
+	
 	public void sendMessage(IOMessage message) throws IOException{
 		send(message.toString());
 	}
@@ -123,10 +132,10 @@ public class IOWebSocket extends WebSocketClient{
 		send(new Message(message).toString());
 	}
 	
+	
 	public static int genID(){
 		currentID++;
 		return currentID;
-		
 	}
 
 	public void setNamespace(String ns) {
@@ -136,5 +145,29 @@ public class IOWebSocket extends WebSocketClient{
 	public String getNamespace() {
 		return namespace;
 	}
-
+	
+	private void setCloseTimeout() {		
+		closeTimeout = new Timer();
+		closeTimeout.schedule(new CloseTask(), ioSocket.getClosingTimeout());
+	}
+	
+	private void clearCloseTimeout() {
+		if (closeTimeout != null) {
+			closeTimeout.cancel();
+			closeTimeout = null;
+		}
+	}
+	
+	private class CloseTask extends TimerTask {
+		@Override
+		public void run() {
+			try {
+				close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			ioSocket.onDisconnect();
+		}
+	};
 }
