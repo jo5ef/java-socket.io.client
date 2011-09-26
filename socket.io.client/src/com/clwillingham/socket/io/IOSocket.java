@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.util.Scanner;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -15,11 +17,13 @@ public class IOSocket {
 	private IOWebSocket webSocket;
 	private URL connection;
 	private String sessionID;
-	private int heartTimeOut;
+	private int heartTimeout;
 	private int closingTimeout;
+	private int connectTimeout = 10000;
 	private String[] protocals;
 	private String webSocketAddress;
 	private MessageCallback callback;
+	private Timer timer;
 	
 	private boolean connecting;
 	private boolean connected;
@@ -52,12 +56,14 @@ public class IOSocket {
 		if(response.contains(":")) {
 			String[] data = response.split(":");
 			setSessionID(data[0]);
-			setHeartTimeOut(Integer.parseInt(data[1]));
-			setClosingTimeout(Integer.parseInt(data[2]));
+			setHeartTimeout(Integer.parseInt(data[1]) * 1000);
+			setClosingTimeout(Integer.parseInt(data[2]) * 1000);
 			setProtocals(data[3].split(","));
 		}
 		
 		connecting = true;
+		timer = new Timer();
+		timer.schedule(new ConnectTimeout(), connectTimeout);
 		webSocket = new IOWebSocket(URI.create(webSocketAddress+"/socket.io/1/websocket/"+sessionID), this, callback);
 		webSocket.setNamespace(namespace);
 		webSocket.connect();
@@ -138,6 +144,18 @@ public class IOSocket {
 			//TODO: reconnect
 		}
 	}
+	
+	public boolean isConnected() {
+		return connected;
+	}
+	
+	public boolean isConnecting() {
+		return connecting;
+	}
+	
+	public boolean isOpen() {
+		return open;
+	}
 
 	public void setConnection(URL connection) {
 		this.connection = connection;
@@ -148,21 +166,25 @@ public class IOSocket {
 		return connection;
 	}
 
-
-	public void setHeartTimeOut(int heartTimeOut) {
-		this.heartTimeOut = heartTimeOut;
+	public void setConnectTimeout(int connectTimeout) {
+		this.connectTimeout = connectTimeout;
+	}
+	
+	public int getConnectTimeout() {
+		return connectTimeout;
 	}
 
-
-	public int getHeartTimeOut() {
-		return heartTimeOut;
+	public void setHeartTimeout(int heartTimeOut) {
+		this.heartTimeout = heartTimeOut;
 	}
 
-
+	public int getHeartTimeout() {
+		return heartTimeout;
+	}
+	
 	public void setClosingTimeout(int closingTimeout) {
 		this.closingTimeout = closingTimeout;
 	}
-
 
 	public int getClosingTimeout() {
 		return closingTimeout;
@@ -187,5 +209,24 @@ public class IOSocket {
 	public String[] getProtocals() {
 		return protocals;
 	}
-
+	
+	private class ConnectTimeout extends TimerTask {
+		@Override
+		public void run() {
+			synchronized(IOSocket.this) {
+				if (connected) {
+					return;
+				}
+				connecting = false;
+				
+				try {
+					webSocket.close();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				callback.onConnectFailure();
+			}
+		}
+	}
 }

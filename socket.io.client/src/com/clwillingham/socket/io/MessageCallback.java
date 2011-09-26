@@ -8,4 +8,5 @@ public interface MessageCallback {
 	public void onMessage(JSONObject json);
 	public void onConnect();
 	public void onDisconnect();
+	public void onConnectFailure();
 }
