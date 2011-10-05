@@ -1,3 +1,3 @@
-[submodule "socket.io.client/Java-Websocket"]
-	path = socket.io.client/Java-Websocket
+[submodule "lib/Java-Websocket"]
+	path = lib/Java-Websocket
 	url = git@github.com:benkay/Java-WebSocket.git
