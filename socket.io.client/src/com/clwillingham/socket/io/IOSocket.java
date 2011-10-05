@@ -35,6 +35,10 @@ public class IOSocket {
 	}
 	
 	public void connect() throws IOException {
+		connecting = true;
+		timer = new Timer();
+		timer.schedule(new ConnectTimeout(), connectTimeout);
+		
 		// check for socket.io namespace
 		String namespace = "";
 		int i = webSocketAddress.lastIndexOf("/");
@@ -61,9 +65,6 @@ public class IOSocket {
 			setProtocals(data[3].split(","));
 		}
 		
-		connecting = true;
-		timer = new Timer();
-		timer.schedule(new ConnectTimeout(), connectTimeout);
 		webSocket = new IOWebSocket(URI.create(webSocketAddress+"/socket.io/1/websocket/"+sessionID), this, callback);
 		webSocket.setNamespace(namespace);
 		webSocket.connect();
