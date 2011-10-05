@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.Scanner;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -48,9 +49,12 @@ public class IOSocket {
 		}
 
 		// perform handshake
-		String url = webSocketAddress.replace("ws://", "http://");
-		URL connection = new URL(url+"/socket.io/1/"); //handshake url
-		InputStream stream = connection.openStream();
+		String address = webSocketAddress.replace("ws://", "http://");
+		URL url = new URL(address + "/socket.io/1/"); //handshake url
+		URLConnection connection = url.openConnection();
+		connection.setConnectTimeout(connectTimeout);
+		connection.setReadTimeout(connectTimeout);
+		InputStream stream = connection.getInputStream();
 		Scanner in = new Scanner(stream);
 		String response = in.nextLine(); //pull the response
 		System.out.println(response);
