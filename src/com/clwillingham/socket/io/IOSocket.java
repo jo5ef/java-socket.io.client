@@ -224,11 +224,13 @@ public class IOSocket {
 				}
 				connecting = false;
 				
-				try {
-					webSocket.close();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+				if (webSocket != null) {
+					try {
+						webSocket.close();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				}
 				callback.onConnectFailure();
 			}
