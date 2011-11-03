@@ -36,7 +36,10 @@ public class IOSocket {
 	}
 	
 	public void connect() throws IOException {
-		connecting = true;
+		synchronized(this) {
+			connecting = true;
+		}
+		
 		timer = new Timer();
 		timer.schedule(new ConnectTimeout(), connectTimeout);
 		
@@ -49,29 +52,39 @@ public class IOSocket {
 		}
 
 		// perform handshake
-		String address = webSocketAddress.replace("ws://", "http://");
-		URL url = new URL(address + "/socket.io/1/"); //handshake url
-		URLConnection connection = url.openConnection();
-		connection.setConnectTimeout(connectTimeout);
-		connection.setReadTimeout(connectTimeout);
-		InputStream stream = connection.getInputStream();
-		Scanner in = new Scanner(stream);
-		String response = in.nextLine(); //pull the response
-		System.out.println(response);
-		
-		// process handshake response
-		// example: 4d4f185e96a7b:15:10:websocket,xhr-polling
-		if(response.contains(":")) {
-			String[] data = response.split(":");
-			setSessionID(data[0]);
-			setHeartTimeout(Integer.parseInt(data[1]) * 1000);
-			setClosingTimeout(Integer.parseInt(data[2]) * 1000);
-			setProtocals(data[3].split(","));
+		try {
+			String address = webSocketAddress.replace("ws://", "http://");
+			URL url = new URL(address + "/socket.io/1/"); //handshake url
+			URLConnection connection = url.openConnection();
+			connection.setConnectTimeout(connectTimeout);
+			connection.setReadTimeout(connectTimeout);
+			InputStream stream = connection.getInputStream();
+			Scanner in = new Scanner(stream);
+			String response = in.nextLine(); //pull the response
+			System.out.println(response);
+			
+			// process handshake response
+			// example: 4d4f185e96a7b:15:10:websocket,xhr-polling
+			if(response.contains(":")) {
+				String[] data = response.split(":");
+				setSessionID(data[0]);
+				setHeartTimeout(Integer.parseInt(data[1]) * 1000);
+				setClosingTimeout(Integer.parseInt(data[2]) * 1000);
+				setProtocals(data[3].split(","));
+			}
+			
+			webSocket = new IOWebSocket(URI.create(webSocketAddress+"/socket.io/1/websocket/"+sessionID), this, callback);
+			webSocket.setNamespace(namespace);
+			webSocket.connect();
+		} catch (IOException e) {
+			synchronized(this) {
+				if (connecting) {
+					connecting = false;	
+				}
+			}
+
+            throw new IOException(e);
 		}
-		
-		webSocket = new IOWebSocket(URI.create(webSocketAddress+"/socket.io/1/websocket/"+sessionID), this, callback);
-		webSocket.setNamespace(namespace);
-		webSocket.connect();
 	}
 	
 	public void emit(String event, JSONObject... message) throws IOException {
@@ -150,11 +163,11 @@ public class IOSocket {
 		}
 	}
 	
-	public boolean isConnected() {
+	public synchronized boolean isConnected() {
 		return connected;
 	}
 	
-	public boolean isConnecting() {
+	public synchronized boolean isConnecting() {
 		return connecting;
 	}
 	
@@ -219,7 +232,7 @@ public class IOSocket {
 		@Override
 		public void run() {
 			synchronized(IOSocket.this) {
-				if (connected) {
+				if (connected || !connecting) {
 					return;
 				}
 				connecting = false;
