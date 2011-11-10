@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.HashMap;
 import java.util.Scanner;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -25,6 +26,9 @@ public class IOSocket {
 	private String webSocketAddress;
 	private MessageCallback callback;
 	private Timer timer;
+	
+	private int ackCount = 0;
+	private HashMap<Integer, AckCallback> ackCallbacks = new HashMap<Integer, AckCallback>();
 	
 	private boolean connecting;
 	private boolean connected;
@@ -104,6 +108,19 @@ public class IOSocket {
 		}
 	}
 	
+	public void emit(String event, JSONObject message, AckCallback callback) throws IOException {
+		try {
+			JSONObject data = new JSONObject();
+			data.put("name", event);
+			data.put("args", message);
+			IOMessage packet = new IOMessage(IOMessage.EVENT, addAcknowledge(callback), "", data.toString());
+			packet.setAck(true);
+			webSocket.sendMessage(packet);
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	public void send(String message) throws IOException {
 		IOMessage packet = new IOMessage(IOMessage.MESSAGE, "", message);
 		webSocket.sendMessage(packet);
@@ -162,6 +179,19 @@ public class IOSocket {
 			//TODO: reconnect
 		}
 	}
+
+	public void onAcknowledge(int ackId, JSONArray data) {
+		AckCallback ackCallback = ackCallbacks.get(ackId);
+		if (ackCallback != null) {
+			try {
+				ackCallback.callback(data);
+			} catch (JSONException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			ackCallbacks.remove(ackId);
+		}
+	}
 	
 	public synchronized boolean isConnected() {
 		return connected;
@@ -177,6 +207,16 @@ public class IOSocket {
 
 	public void setConnection(URL connection) {
 		this.connection = connection;
+	}
+	
+	private int addAcknowledge(AckCallback cb) {
+		if (cb != null) {
+			ackCount++;
+			ackCallbacks.put(ackCount, cb);
+			return ackCount;
+		}
+		
+		return -1;
 	}
 
 

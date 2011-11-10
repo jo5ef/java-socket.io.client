@@ -14,7 +14,8 @@ public class IOMessage {
 	private int id = -1;
 	private String endpoint = "";
 	private String messageData;
-	
+	private boolean ack = false;
+
 	public IOMessage(int type, int id, String endpoint, String data){
 		this.type = type;
 		this.id = id;
@@ -65,7 +66,8 @@ public class IOMessage {
 			return type+":::"+messageData;
 		}
 		else if(id > -1){
-			return type+":"+id+":"+endpoint+":"+messageData;
+			String idAck = ack ? "+" : "";
+			return type + ":" + id + idAck + ":" + endpoint + ":" + messageData;
 		}
 		else{
 			return type+"::"+endpoint+":"+messageData;
@@ -112,5 +114,14 @@ public class IOMessage {
 		return messageData;
 	}
 	
+
+	public void setAck(boolean ack) {
+		this.ack = ack;
+	}
+
+
+	public boolean getAck() {
+		return ack;
+	}
 
 }
