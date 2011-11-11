@@ -113,7 +113,7 @@ public class IOSocket {
 			JSONObject data = new JSONObject();
 			data.put("name", event);
 			data.put("args", message);
-			IOMessage packet = new IOMessage(IOMessage.EVENT, addAcknowledge(callback), "", data.toString());
+			IOMessage packet = new IOMessage(IOMessage.EVENT, addAcknowledge(callback, message), "", data.toString());
 			packet.setAck(true);
 			webSocket.sendMessage(packet);
 		} catch (JSONException e) {
@@ -209,8 +209,9 @@ public class IOSocket {
 		this.connection = connection;
 	}
 	
-	private int addAcknowledge(AckCallback cb) {
+	private int addAcknowledge(AckCallback cb, JSONObject message) {
 		if (cb != null) {
+			cb.setRequestData(message);
 			ackCount++;
 			ackCallbacks.put(ackCount, cb);
 			return ackCount;
