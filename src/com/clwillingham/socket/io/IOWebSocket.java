@@ -98,8 +98,9 @@ public class IOWebSocket extends WebSocketClient {
 	@Override
 	public void onOpen() {
 		try {
-			if (namespace != "")
-				init(namespace);
+			if (!namespace.equals("")) {
+                init(namespace);
+            }
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
