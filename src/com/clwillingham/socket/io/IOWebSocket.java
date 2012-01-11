@@ -88,6 +88,21 @@ public class IOWebSocket extends WebSocketClient {
 			break;
 			
 		case IOMessage.ACK:
+			String[] parts = message.getMessageData().split("\\+", 2);
+			int ackId = Integer.parseInt(parts[0]);
+			
+			JSONArray data = null;
+			if (parts.length > 1) {
+				try {
+					data = new JSONArray(parts[1]);
+				} catch (JSONException e) {
+					e.printStackTrace();
+				}
+			}
+			
+			ioSocket.onAcknowledge(ackId, data);
+			break;
+			
 		case IOMessage.ERROR:
 		case IOMessage.DISCONNECT:
 			//TODO
