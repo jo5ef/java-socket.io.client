@@ -23,8 +23,9 @@ public class IOSocket {
 	private int closingTimeout;
 	private int connectTimeout = 10000;
 	private String[] protocals;
-	private String webSocketAddress;
-	private MessageCallback callback;
+	private final String webSocketAddress;
+    private final String namespace;
+	private final MessageCallback callback;
 	private Timer timer;
 	
 	private int ackCount = 0;
@@ -35,11 +36,21 @@ public class IOSocket {
 	private boolean open;
 	
 	public IOSocket(String address, MessageCallback callback){
-		webSocketAddress = address;
+        
+        // check for socket.io namespace
+        int i = address.lastIndexOf("/");
+        if (address.charAt(i-1) != '/') {
+            namespace = address.substring(i);
+            webSocketAddress = address.substring(0, i);
+        } else {
+            namespace = "";
+            webSocketAddress = address;
+        }
+        
 		this.callback = callback;
 	}
 	
-	public void connect() throws IOException {
+	public void connect() {
 		synchronized(this) {
 			connecting = true;
 		}
@@ -47,48 +58,7 @@ public class IOSocket {
 		timer = new Timer();
 		timer.schedule(new ConnectTimeout(), connectTimeout);
 		
-		// check for socket.io namespace
-		String namespace = "";
-		int i = webSocketAddress.lastIndexOf("/");
-		if (webSocketAddress.charAt(i-1) != '/') {
-			namespace = webSocketAddress.substring(i);
-			webSocketAddress = webSocketAddress.substring(0, i);
-		}
-
-		// perform handshake
-		try {
-			String address = webSocketAddress.replace("ws://", "http://");
-			URL url = new URL(address + "/socket.io/1/"); //handshake url
-			URLConnection connection = url.openConnection();
-			connection.setConnectTimeout(connectTimeout);
-			connection.setReadTimeout(connectTimeout);
-			InputStream stream = connection.getInputStream();
-			Scanner in = new Scanner(stream);
-			String response = in.nextLine(); //pull the response
-			System.out.println(response);
-			
-			// process handshake response
-			// example: 4d4f185e96a7b:15:10:websocket,xhr-polling
-			if(response.contains(":")) {
-				String[] data = response.split(":");
-				setSessionID(data[0]);
-				setHeartTimeout(Integer.parseInt(data[1]) * 1000);
-				setClosingTimeout(Integer.parseInt(data[2]) * 1000);
-				setProtocals(data[3].split(","));
-			}
-			
-			webSocket = new IOWebSocket(URI.create(webSocketAddress+"/socket.io/1/websocket/"+sessionID), this, callback);
-			webSocket.setNamespace(namespace);
-			webSocket.connect();
-		} catch (IOException e) {
-			synchronized(this) {
-				if (connecting) {
-					connecting = false;	
-				}
-			}
-
-            throw new IOException(e);
-		}
+        (new Thread(new Handshake())).start();
 	}
 	
 	public void emit(String event, JSONObject... message) throws IOException {
@@ -149,6 +119,7 @@ public class IOSocket {
 	}
 	
 	synchronized void onConnect() {
+
 		if (!connected) {
 			connected = true;
 			connecting = false;
@@ -179,6 +150,13 @@ public class IOSocket {
 			//TODO: reconnect
 		}
 	}
+    
+    private synchronized void onConnectFailure() {
+        connecting = false;
+        connected = false;
+        
+        callback.onConnectFailure();
+    }
 
 	public void onAcknowledge(int ackId, JSONArray data) {
 		AckCallback ackCallback = ackCallbacks.get(ackId);
@@ -268,6 +246,49 @@ public class IOSocket {
 	public String[] getProtocals() {
 		return protocals;
 	}
+    
+    private synchronized void onHandshakeSuccess() {
+        if (!connecting) {
+            return;
+        }
+
+        webSocket = new IOWebSocket(URI.create(webSocketAddress+"/socket.io/1/websocket/"+sessionID), this, callback);
+        webSocket.setNamespace(namespace);
+        webSocket.connect();
+    }
+    
+    private class Handshake implements Runnable {
+        @Override
+        public void run() {
+            try {
+                String address = webSocketAddress.replace("ws://", "http://");
+                URL url = new URL(address + "/socket.io/1/"); //handshake url
+                URLConnection connection = url.openConnection();
+                connection.setConnectTimeout(connectTimeout);
+                connection.setReadTimeout(connectTimeout);
+                InputStream stream = connection.getInputStream();
+                Scanner in = new Scanner(stream);
+                String response = in.nextLine(); //pull the response
+
+                // process handshake response
+                // example: 4d4f185e96a7b:15:10:websocket,xhr-polling
+                if(response.contains(":")) {
+                    String[] data = response.split(":");
+                    setSessionID(data[0]);
+                    setHeartTimeout(Integer.parseInt(data[1]) * 1000);
+                    setClosingTimeout(Integer.parseInt(data[2]) * 1000);
+                    setProtocals(data[3].split(","));
+ 
+                    onHandshakeSuccess();
+                } else {
+                    onConnectFailure();
+                }
+
+            } catch (IOException e) {
+                onConnectFailure();
+            }
+        }
+    }
 	
 	private class ConnectTimeout extends TimerTask {
 		@Override
@@ -286,7 +307,7 @@ public class IOSocket {
 						e.printStackTrace();
 					}
 				}
-				callback.onConnectFailure();
+				onConnectFailure();
 			}
 		}
 	}

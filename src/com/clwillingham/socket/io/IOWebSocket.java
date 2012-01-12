@@ -185,5 +185,5 @@ public class IOWebSocket extends WebSocketClient {
 			}
 			ioSocket.onDisconnect();
 		}
-	};
+	}
 }
