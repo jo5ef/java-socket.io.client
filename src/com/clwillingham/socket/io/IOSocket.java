@@ -24,6 +24,7 @@ public class IOSocket {
 	private int connectTimeout = 10000;
 	private String[] protocals;
 	private final String webSocketAddress;
+	private final String query;
     private final String namespace;
 	private final MessageCallback callback;
 	private Timer timer;
@@ -46,6 +47,9 @@ public class IOSocket {
             namespace = "";
             webSocketAddress = address;
         }
+        
+        i = address.lastIndexOf("?");
+        query = i != -1 ? address.substring(i) : "";
         
 		this.callback = callback;
 	}
@@ -262,7 +266,7 @@ public class IOSocket {
         public void run() {
             try {
                 String address = webSocketAddress.replace("ws://", "http://");
-                URL url = new URL(address + "/socket.io/1/"); //handshake url
+                URL url = new URL(address + "/socket.io/1/" + query); //handshake url
                 URLConnection connection = url.openConnection();
                 connection.setConnectTimeout(connectTimeout);
                 connection.setReadTimeout(connectTimeout);
